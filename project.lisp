@@ -262,12 +262,31 @@
 (check= (chopsticks '((1 4) (3 2)) '(left right)) '((3 3) (1 4)))
 (check= (chopsticks '((1 4) (3 2)) '(right left)) '((0 2) (1 4)))
 (check= (chopsticks '((2 2) (3 2)) '(1 left)) '((3 2) (1 3)))
-(check= (chopsticks '((1 4) (3 2)) '(2 right)) '((3 2) (3 2)))#|ACL2s-ToDo-Line|#
+(check= (chopsticks '((1 4) (3 2)) '(2 right)) '((3 2) (3 2)))
 
 
 
+;;determines if player one has won given game state
+(definec win? (s :game-state) :bool
+  :ic (game-state-ic s)
+  (and (equal (caadr s) 0) (equal (cadadr s) 0)))
 
 
+(check= (win? '((1 4) (3 2))) nil)
+(check= (win? '((0 0) (3 2))) nil)
+(check= (win? '((1 4) (0 0))) t)
 
+;;determines if player one has lost given game state
+(definec lose? (s :game-state) :bool
+  :ic (game-state-ic s)
+  (and (equal (caar s) 0) (equal (cadar s) 0)))
 
+(check= (lose? '((1 4) (3 2))) nil)
+(check= (lose? '((0 0) (3 2))) t)
+(check= (lose? '((1 4) (0 0))) nil)#|ACL2s-ToDo-Line|#
+
+        
+
+;;tie together three functions so that it chopsticks function repeats till
+;;win or lose is true
 
