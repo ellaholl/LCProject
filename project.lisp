@@ -287,6 +287,6 @@
 
         
 
-;;tie together three functions so that it chopsticks function repeats till
-;;win or lose is true
+;;tie together three functions so that chopsticks function repeats till
+;;win or lose returns true
 
