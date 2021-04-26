@@ -371,7 +371,7 @@
                (if (transfer-ic s '(3 right))
                (chopsticks-win-solver (chopsticks s '(3 right)) (- n 1)) nil)
                (if (transfer-ic s '(4 right))
-               (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))#|ACL2s-ToDo-Line|#
+               (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))
 
 
 ;;tests for zero moves
