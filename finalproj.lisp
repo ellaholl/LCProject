@@ -64,19 +64,31 @@
 ; ******************* END INITIALIZATION FOR ACL2s MODE ******************* ;
 ;$ACL2s-SMode$;ACL2s
 
-(defdata hand nat) ;;represents one of a player's hands (the number of fingers active)
-(defdata player (list hand hand)) ;;represents a player's two hands
-(defdata game-state (list player player)) ;;The first player represents the player whose turn it is currently.
-(defdata side (oneof 'left 'right)) ;;represents one of a player's hands, either the first in the list (left)
-;;or the second (right)
-(defdata tap (list side side)) ;;represents a tap move, where the player taps, with their hand on the
-;;first side, the opponent's hand (on the second side).
-(defdata transfer (list nat side)) ;;represents a transfer move, where the player transfers the given
-;;number of fingers from their hand on the given side to their other hand.
-(defdata move (oneof tap transfer)) ;;represents a player's move, either a tap or a transfer.
+;;represents one of a player's hands (the number of fingers active)
+(defdata hand nat)
 
-;;takes in a game-state and determines whether it can exist (meaning, there are
-;;less than 5 fingers per hand).
+;;represents a player's two hands
+(defdata player (list hand hand))
+
+;;The first player represents the player whose turn it is currently.
+(defdata game-state (list player player)) 
+
+;;represents one of a player's hands, either the first in the list (left) or the second (right)
+(defdata side (oneof 'left 'right))
+
+;;represents a tap move, where the player taps, with their hand on the first side, the 
+;;opponent's hand (on the second side).
+(defdata tap (list side side))
+
+;;represents a transfer move, where the player transfers the given
+;;number of fingers from their hand on the given side to their other hand.
+(defdata transfer (list nat side))
+
+;;represents a player's move, either a tap or a transfer.
+(defdata move (oneof tap transfer))
+
+;;takes in a game-state and determines whether it can exist 
+;;(meaning, there are less than 5 fingers per hand).
 (definec game-state-ic (s :game-state) :boolean
   (and (> 5 (caar s)) (> 5 (cadar s)) (> 5 (caadr s)) (> 5 (cadadr s))))
 
@@ -195,7 +207,8 @@
 (check= (chopsticks-ic (list (list 2 0) (list 0 0)) (list 3 'left)) nil)
 (check= (chopsticks-ic (list (list 2 0) (list 0 0)) (list 1 'left)) t)
 
-;;takes in two hands, where the first is added to the second, and outputs the resulting second hand.
+;;takes in two hands, where the first is added to the second, and outputs 
+;;the resulting second hand.
 (definec tap-help (h1 :hand h2 :hand) :hand
   :ic (and (< 0 h2) (< 0 h1) (< h1 5) (< h2 5))
   (if (> (+ h1 h2) 4)
@@ -205,7 +218,6 @@
 (check= (tap-help 3 1) 4)
 (check= (tap-help 2 4) 0)
 (check= (tap-help 1 2) 3)
-
 
 
 ;;takes in a game-state and a tap and outputs the resulting game-state.
@@ -265,7 +277,6 @@
 (check= (chopsticks '((1 4) (3 2)) '(2 right)) '((3 2) (3 2)))
 
 
-
 ;;determines if player one has won given game state
 (definec win? (s :game-state) :bool
   :ic (game-state-ic s)
@@ -286,16 +297,13 @@
 (check= (lose? '((1 4) (0 0))) nil)
         
 
-;;tie together three functions so that it chopsticks function repeats till
-;;win or lose is true
-
-
+;;determines if two states are the same
+;;used in move solver to determine if starting state has reached the end state
 (definec same-state (s1 :game-state s2 :game-state) :boolean
   (and (= (caar s1) (caar s2))
        (= (cadar s1) (cadar s2))
        (= (caadr s1) (caadr s2))
-       (= (cadadr s1) (cadadr s2)))
-)
+       (= (cadadr s1) (cadadr s2))))
 
 (check= (same-state '((0 0) (0 0)) '((0 0) (0 0))) t)
 (check= (same-state '((2 0) (0 0)) '((0 0) (0 0))) nil)
@@ -305,7 +313,7 @@
 (check= (same-state '((1 2) (3 4)) '((1 2) (3 4))) t)
 
 
-;;functino step specific for testing just one move
+;;function step specific for testing just one move
 (definec chopsticks-no-rev (s :game-state m :move) :game-state
   :ic (and (game-state-ic s) (chopsticks-ic s m))
   (cond ((tapp m) (tap s m))
@@ -316,36 +324,41 @@
 (check= (chopsticks-no-rev '((2 2) (3 2)) '(1 left)) '((1 3) (3 2)))
 (check= (chopsticks-no-rev '((1 4) (3 2)) '(2 right)) '((3 2) (3 2)))
 
-#|;;specific for when n = 1
+#|
+
+;;Function that tests satisfiability of one step:
+;;(specific for when n = 1)
 (definec chopsticks-solver-one (s :game-state e :game-state) :boolean
   :ic (and (game-state-ic s) (game-state-ic e))
   :timeout 1000
   (cond ((same-state s e) t)
         ((or (win? s) (lose? s)) nil)
-        ((and (tap-ic s '(left left)) (same-state (chopsticks-no-rev s '(left left)) e)) t)
-        ((and (tap-ic s '(left right)) (same-state (chopsticks-no-rev s '(left right)) e)) t)
-        ((and (tap-ic s '(right left)) (same-state (chopsticks-no-rev s '(right left)) e)) t)
-        ((and (tap-ic s '(right right)) (same-state (chopsticks-no-rev s '(right right)) e)) t)
-        ((and (transfer-ic s '(1 left)) (same-state (chopsticks-no-rev s '(1 left)) e)) t)
-        ((and (transfer-ic s '(2 left)) (same-state (chopsticks-no-rev s '(2 left)) e)) t)
-        ((and (transfer-ic s '(3 left)) (same-state (chopsticks-no-rev s '(3 left)) e)) t)
-        ((and (transfer-ic s '(4 left)) (same-state (chopsticks-no-rev s '(4 left)) e)) t)
-        ((and (transfer-ic s '(1 right)) (same-state (chopsticks-no-rev s '(1 right)) e)) t)
-        ((and (transfer-ic s '(2 right)) (same-state (chopsticks-no-rev s '(2 right)) e)) t)
-        ((and (transfer-ic s '(3 right)) (same-state (chopsticks-no-rev s '(3 right)) e)) t)
-        ((and (transfer-ic s '(4 right)) (same-state (chopsticks-no-rev s '(4 right)) e)) t)
-        (t nil)));;could replace this to implement recursion
+        (t (or
+        (if (tap-ic s '(left left)) (same-state (chopsticks s '(left left)) (rev e)) nil)
+        (if (tap-ic s '(left right)) (same-state (chopsticks s '(left right)) (rev e)) nil)
+        (if (tap-ic s '(right left)) (same-state (chopsticks s '(right left)) (rev e)) nil)
+        (if (tap-ic s '(right right)) (same-state (chopsticks s '(right right)) (rev e)) nil)
+        (if (transfer-ic s '(1 left)) (same-state (chopsticks s '(1 left)) (rev e)) nil)
+        (if (transfer-ic s '(2 left)) (same-state (chopsticks s '(2 left)) (rev e)) nil)
+        (if (transfer-ic s '(3 left)) (same-state (chopsticks s '(3 left)) (rev e)) nil)
+        (if (transfer-ic s '(4 left)) (same-state (chopsticks s '(4 left)) (rev e)) nil)
+        (if (transfer-ic s '(1 right)) (same-state (chopsticks s '(1 right)) (rev e)) nil)
+        (if (transfer-ic s '(2 right)) (same-state (chopsticks s '(2 right)) (rev e)) nil)
+        (if (transfer-ic s '(3 right)) (same-state (chopsticks s '(3 right)) (rev e)) nil)
+        (if (transfer-ic s '(4 right)) (same-state (chopsticks s '(4 right)) (rev e)) nil)))))
+
 
 (check= (chopsticks-solver-one '((1 1) (1 1)) '((1 1) (1 1))) t)
 (check= (chopsticks-solver-one '((1 1) (1 1)) '((1 1) (1 3))) nil)
 (check= (chopsticks-solver-one '((1 4) (1 1)) '((1 1) (1 4))) t)
 |#
 
+
 ;;proving a win with starting game state and n number of moves
 ;;first method of proving satisfiability 
 (definec chopsticks-win-solver (s :game-state n :int) :boolean
-  :ic (and (game-state-ic s) (> 2 n) (<= 0 n))
-  :timeout 10000
+  :ic (and (game-state-ic s) (> 1 n) (<= 0 n))
+  :timeout 500
   (cond ((and (win? s)) t)
         ((or (zp n) (lose? s)) nil)
         (t (or (if (tap-ic s '(left left))
@@ -373,7 +386,6 @@
                (if (transfer-ic s '(4 right))
                (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))
 
-
 ;;tests for zero moves
 (check= (chopsticks-win-solver '((1 1) (1 1)) 0) nil)
 (check= (chopsticks-win-solver '((1 2) (1 2)) 0) nil)
@@ -386,7 +398,9 @@
 
 ;;tests for zero moves but already in a winning state
 (check= (chopsticks-win-solver '((0 0) (3 3)) 0) nil);;represents a loss
-(check= (chopsticks-win-solver '((2 4) (0 0)) 0) t)
+(check= (chopsticks-win-solver '((0 0) (4 1)) 0) nil)
+(check= (chopsticks-win-solver '((2 4) (0 0)) 0) t);;represents a win
+(check= (chopsticks-win-solver '((4 1) (0 0)) 0) t)
 
 
 ;;function to find ending game state that will guarentee a win:
@@ -422,9 +436,8 @@
 
 (check= (chopsticks-win-state '((2 4) (0 0)) 0) '((2 4) (0 0)))
 
-
-;;can compare this function by plugging in the ending game state generated by previous function
-;;would input result of chopsticks-win-state to prove satisfiability of a win with n moves
+;;function can confirm the satisfiability of reaching given ending game state given n number of moves
+;;can input result of chopsticks-win-state as ending game state to prove satisfiability of a win with n moves
 (definec chopsticks-move-solver (s :game-state e :game-state n :int) :boolean
   :ic (and (game-state-ic s) (game-state-ic e) (> 1 n) (<= 0 n))
   :timeout 1000
@@ -456,7 +469,8 @@
                (chopsticks-move-solver (chopsticks s '(4 right)) (rev e) (- n 1)) nil)))))
 
 (check= (chopsticks-move-solver '((1 2) (3 4))'((0 4) (1 2)) 0) nil)
-(check= (chopsticks-move-solver '((1 2) (3 4))'((3 3) (4 2)) 0) nil)
+(check= (chopsticks-move-solver '((1 2) (3 4))'((3 3) (4 2)) 0) nil)#|ACL2s-ToDo-Line|#
+
 ;;(check= (chopsticks-move-solver '((1 2) (3 4))'((0 4) (1 2)) 1) t)
 ;;(check= (chopsticks-move-solver '((1 2) (3 4))'((0 4) (1 2)) 2) t)
 ;;(check= (chopsticks-move-solver '((1 1) (1 1)) '((1 2) (1 1)) 1) t)
@@ -465,8 +479,7 @@
 ;;(check= (chopsticks-move-solver '((1 1) (1 1)) '((1 1) (1 1)) 1) t)
 
 
-;;bad way of doing it: accumulate everything into a list of list
-;;when first called input an empty list of list for l. each list in list should be of length n or less if ending game state is reached
+;;if successful, could compare the two method of proving winning satisfiability
+(defthm (implies (chopsticks-win-solver '((1 1) '(0 0)) 0) 
+        (chopsticks-move-solver '((0 0) (2 2)) (chopsticks-win-state '((1 1) (0 0)) 0) 0)))
 
-(check= (chopsticks-win-solver '((1 1) '(0 0)) 0) 
-        (chopsticks-move-solver '((0 0) (2 2)) (chopsticks-win-state '((1 1) (0 0)) 0) 0))
