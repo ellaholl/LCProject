@@ -399,7 +399,7 @@
 ;;proving a win with starting game state and n number of moves
 ;;first method of proving satisfiability 
 (definec chopsticks-win-solver (s :game-state n :int) :boolean
-  :ic (and (game-state-ic s) (> 1 n) (<= 0 n));;add restriction: input must be divisible by two so that player starts and ends on their turn
+  :ic (and (game-state-ic s) (> 1 n) (<= 0 n))
   :timeout 500
   (cond ((and (win? s)) t)
         ((or (zp n) (lose? s)) nil)
@@ -426,7 +426,7 @@
                (if (transfer-ic s '(3 right))
                (chopsticks-win-solver (chopsticks s '(3 right)) (- n 1)) nil)
                (if (transfer-ic s '(4 right))
-               (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))#|ACL2s-ToDo-Line|#
+               (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))
 
 
 ;;tests for zero moves
