@@ -104,6 +104,9 @@
 (check= (game-state-ic (list (list 27 1) (list 3 4))) nil)
 (check= (game-state-ic (list (list 13 92) (list 1000 69))) nil)
 
+
+
+
 ;;takes in a game-state and a tap and checks whether this tap is valid
 (definec tap-ic (s :game-state tap :tap) :boolean
   :ic (game-state-ic s)
@@ -211,6 +214,7 @@
 ;;the resulting second hand.
 (definec tap-help (h1 :hand h2 :hand) :hand
   :ic (and (< 0 h2) (< 0 h1) (< h1 5) (< h2 5))
+  :oc (> 5 (tap-help h1 h2))
   (if (> (+ h1 h2) 4)
       0
       (+ h1 h2)))
@@ -223,6 +227,7 @@
 ;;takes in a game-state and a tap and outputs the resulting game-state.
 (definec tap (s :game-state tap :tap) :game-state
   :ic (and (game-state-ic s) (tap-ic s tap))
+  :oc (game-state-ic (tap s tap))
   (cond ((and (equal 'left (car tap))
               (equal 'left (cadr tap))) (list (car s)
                                               (list (tap-help (caar s)
@@ -254,6 +259,7 @@
 ;;takes in a game-state and a transfer and outputs the resulting game-state.
 (definec transfer (s :game-state tran :transfer) :game-state
   :ic (and (game-state-ic s) (transfer-ic s tran))
+  :oc (game-state-ic (transfer s tran))
   (cond ((equal 'left (cadr tran)) (list (list (- (caar s) (car tran))
                                                (+ (cadar s) (car tran)))
                                          (cadr s)))
@@ -264,12 +270,30 @@
 (check= (transfer '((1 3) (2 3)) '(1 right)) '((2 2) (2 3)))
 (check= (transfer '((3 2) (2 3)) '(2 left)) '((1 4) (2 3)))
 
+
+
+(definec revGS (s :game-state) :game-state
+  :ic (game-state-ic s)
+  :oc (game-state-ic (revGS s))
+  (list (cadr s) (car s)))
+
+(check= (revGS '((1 1) (2 2))) '((2 2) (1 1)))
+(check= (revGS '((3 3) (4 1))) '((4 1) (3 3)))
+(check= (revGS '((1 3) (2 2))) '((2 2) (1 3)))
+(check= (revGS '((0 0) (2 3))) '((2 3) (0 0)))
+
+;;proving that revresing a game state will still satisfy the game-state contract
+;;necessary for when implementing recursion on gamestates
+(check= (game-state-ic '((1 1) (2 2))) (game-state-ic (revGS '((1 1) (2 2)))))
+(check= (game-state-ic '((3 2) (1 1))) (game-state-ic (revGS '((3 2) (1 1)))))
+
 ;;takes in a game-state and a move and outputs the resulting game-state, with the player order
 ;;reversed to indicate that the player whose turn it is has switched.
 (definec chopsticks (s :game-state m :move) :game-state
   :ic (and (game-state-ic s) (chopsticks-ic s m))
-  (cond ((tapp m) (rev (tap s m)))
-        ((transferp m) (rev (transfer s m)))))
+  :oc (game-state-ic (chopsticks s m))
+  (cond ((tapp m) (revGS (tap s m)))
+        ((transferp m) (revGS (transfer s m)))))
 
 (check= (chopsticks '((1 4) (3 2)) '(left right)) '((3 3) (1 4)))
 (check= (chopsticks '((1 4) (3 2)) '(right left)) '((0 2) (1 4)))
@@ -300,6 +324,7 @@
 ;;determines if two states are the same
 ;;used in move solver to determine if starting state has reached the end state
 (definec same-state (s1 :game-state s2 :game-state) :boolean
+  :ic (and (game-state-ic s1) (game-state-ic s2))
   (and (= (caar s1) (caar s2))
        (= (cadar s1) (cadar s2))
        (= (caadr s1) (caadr s2))
@@ -307,45 +332,63 @@
 
 (check= (same-state '((0 0) (0 0)) '((0 0) (0 0))) t)
 (check= (same-state '((2 0) (0 0)) '((0 0) (0 0))) nil)
-(check= (same-state '((0 5) (0 0)) '((0 0) (0 0))) nil)
-(check= (same-state '((0 0) (5 0)) '((0 0) (0 0))) nil)
-(check= (same-state '((0 0) (0 5)) '((0 0) (0 0))) nil)
+(check= (same-state '((0 4) (0 0)) '((0 0) (0 0))) nil)
+(check= (same-state '((0 0) (4 0)) '((0 0) (0 0))) nil)
+(check= (same-state '((0 0) (0 2)) '((0 0) (0 0))) nil)
 (check= (same-state '((1 2) (3 4)) '((1 2) (3 4))) t)
 
 
-;;function step specific for testing just one move
-(definec chopsticks-no-rev (s :game-state m :move) :game-state
-  :ic (and (game-state-ic s) (chopsticks-ic s m))
-  (cond ((tapp m) (tap s m))
-        ((transferp m) (transfer s m))))
-
-(check= (chopsticks-no-rev '((1 4) (3 2)) '(left right)) '((1 4) (3 3)))
-(check= (chopsticks-no-rev '((1 4) (3 2)) '(right left)) '((1 4) (0 2)))
-(check= (chopsticks-no-rev '((2 2) (3 2)) '(1 left)) '((1 3) (3 2)))
-(check= (chopsticks-no-rev '((1 4) (3 2)) '(2 right)) '((3 2) (3 2)))
-
-#|
-
-;;Function that tests satisfiability of one step:
+;;Function that tests satisfiability of chopsticks-solver-one:
 ;;(specific for when n = 1)
-(definec chopsticks-solver-one (s :game-state e :game-state) :boolean
+(definec chopsticks-solver-one-test (s :game-state e :game-state) :boolean
   :ic (and (game-state-ic s) (game-state-ic e))
-  :timeout 1000
+  :timeout 500
   (cond ((same-state s e) t)
         ((or (win? s) (lose? s)) nil)
         (t (or
-        (if (tap-ic s '(left left)) (same-state (chopsticks s '(left left)) (rev e)) nil)
-        (if (tap-ic s '(left right)) (same-state (chopsticks s '(left right)) (rev e)) nil)
-        (if (tap-ic s '(right left)) (same-state (chopsticks s '(right left)) (rev e)) nil)
-        (if (tap-ic s '(right right)) (same-state (chopsticks s '(right right)) (rev e)) nil)
-        (if (transfer-ic s '(1 left)) (same-state (chopsticks s '(1 left)) (rev e)) nil)
-        (if (transfer-ic s '(2 left)) (same-state (chopsticks s '(2 left)) (rev e)) nil)
-        (if (transfer-ic s '(3 left)) (same-state (chopsticks s '(3 left)) (rev e)) nil)
-        (if (transfer-ic s '(4 left)) (same-state (chopsticks s '(4 left)) (rev e)) nil)
-        (if (transfer-ic s '(1 right)) (same-state (chopsticks s '(1 right)) (rev e)) nil)
-        (if (transfer-ic s '(2 right)) (same-state (chopsticks s '(2 right)) (rev e)) nil)
-        (if (transfer-ic s '(3 right)) (same-state (chopsticks s '(3 right)) (rev e)) nil)
-        (if (transfer-ic s '(4 right)) (same-state (chopsticks s '(4 right)) (rev e)) nil)))))
+           (if (tap-ic s '(left left)) t nil)
+           (if (tap-ic s '(left right)) t nil)
+           (if (tap-ic s '(right left)) t nil)
+           (if (tap-ic s '(right right)) t nil)
+           (if (transfer-ic s '(1 left)) t nil)
+           (if (transfer-ic s '(2 left)) t nil)
+           (if (transfer-ic s '(3 left)) t nil)
+           (if (transfer-ic s '(4 left)) t nil)
+           (if (transfer-ic s '(1 right)) t nil)
+           (if (transfer-ic s '(2 right)) t nil)
+           (if (transfer-ic s '(3 right)) t nil)
+           (if (transfer-ic s '(4 right)) t nil)))))
+
+
+;;writing tests to see if there's a problem with same-state and/or 
+(check= (same-state (chopsticks '((1 1) (1 1)) '(left left)) (revGS '((1 1) (2 1)))) t)
+(check= (same-state (chopsticks '((2 3) (2 3)) '(left right)) (revGS '((1 1) (1 1)))) nil)
+ 
+
+#|
+;;Function that tests satisfiability of one step:
+;;(specific for when n = 1)
+(defunc chopsticks-solver-one (s e) 
+  :ic (and (game-statep s) (game-statep e) (game-state-ic s) (game-state-ic e))
+  :oc (boolp (chopsticks-solver-one s e))
+  ;;:timeout 500
+  (declare (xargs :guard-debug t :measure-debug t))
+  (cond ((same-state s e) t)
+        ((or (win? s) (lose? s)) nil)
+        (t (or
+           (if (tap-ic s '(left left)) (same-state (chopsticks s '(left left)) (revGS e)) nil)
+           (if (tap-ic s '(left right)) (same-state (chopsticks s '(left right)) (revGS e)) nil)
+           (if (tap-ic s '(right left)) (same-state (chopsticks s '(right left)) (revGS e)) nil)
+           (if (tap-ic s '(right right)) (same-state (chopsticks s '(right right)) (revGS e)) nil)
+           (if (transfer-ic s '(1 left)) (same-state (chopsticks s '(1 left)) (revGS e)) nil)
+           (if (transfer-ic s '(2 left)) (same-state (chopsticks s '(2 left)) (revGS e)) nil)
+           (if (transfer-ic s '(3 left)) (same-state (chopsticks s '(3 left)) (revGS e)) nil)
+           (if (transfer-ic s '(4 left)) (same-state (chopsticks s '(4 left)) (revGS e)) nil)
+           (if (transfer-ic s '(1 right)) (same-state (chopsticks s '(1 right)) (revGS e)) nil)
+           (if (transfer-ic s '(2 right)) (same-state (chopsticks s '(2 right)) (revGS e)) nil)
+           (if (transfer-ic s '(3 right)) (same-state (chopsticks s '(3 right)) (revGS e)) nil)
+           (if (transfer-ic s '(4 right)) (same-state (chopsticks s '(4 right)) (revGS e)) nil)
+           ))))
 
 
 (check= (chopsticks-solver-one '((1 1) (1 1)) '((1 1) (1 1))) t)
@@ -353,11 +396,10 @@
 (check= (chopsticks-solver-one '((1 4) (1 1)) '((1 1) (1 4))) t)
 |#
 
-
 ;;proving a win with starting game state and n number of moves
 ;;first method of proving satisfiability 
 (definec chopsticks-win-solver (s :game-state n :int) :boolean
-  :ic (and (game-state-ic s) (> 1 n) (<= 0 n))
+  :ic (and (game-state-ic s) (> 1 n) (<= 0 n));;add restriction: input must be divisible by two so that player starts and ends on their turn
   :timeout 500
   (cond ((and (win? s)) t)
         ((or (zp n) (lose? s)) nil)
@@ -384,7 +426,8 @@
                (if (transfer-ic s '(3 right))
                (chopsticks-win-solver (chopsticks s '(3 right)) (- n 1)) nil)
                (if (transfer-ic s '(4 right))
-               (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))
+               (chopsticks-win-solver (chopsticks s '(4 right)) (- n 1)) nil)))))#|ACL2s-ToDo-Line|#
+
 
 ;;tests for zero moves
 (check= (chopsticks-win-solver '((1 1) (1 1)) 0) nil)
@@ -407,7 +450,8 @@
 ;;can be used to determine end state for second method of proving satisfiability
 (definec chopsticks-win-state (s :game-state n :int) :game-state
   :ic (and  (game-state-ic s) (> 1 n) (<= 0 n) (chopsticks-win-solver s n))
-  :timeout 1000
+  :oc (game-state-ic (chopsticks-win-state s n))
+  :timeout 500
   (cond ((and (win? s) (== (mod n 2) 0)) s)
         (t (or (if (tap-ic s '(left left))
                (chopsticks-win-state (chopsticks s '(left left)) (- n 1)) nil)
@@ -469,8 +513,8 @@
                (chopsticks-move-solver (chopsticks s '(4 right)) (rev e) (- n 1)) nil)))))
 
 (check= (chopsticks-move-solver '((1 2) (3 4))'((0 4) (1 2)) 0) nil)
-(check= (chopsticks-move-solver '((1 2) (3 4))'((3 3) (4 2)) 0) nil)#|ACL2s-ToDo-Line|#
-
+(check= (chopsticks-move-solver '((1 2) (3 4))'((3 3) (4 2)) 0) nil)
+(check= (chopsticks-move-solver '((1 2) (3 4))'((1 2) (3 4)) 0) t)
 ;;(check= (chopsticks-move-solver '((1 2) (3 4))'((0 4) (1 2)) 1) t)
 ;;(check= (chopsticks-move-solver '((1 2) (3 4))'((0 4) (1 2)) 2) t)
 ;;(check= (chopsticks-move-solver '((1 1) (1 1)) '((1 2) (1 1)) 1) t)
@@ -478,8 +522,8 @@
 ;;(check= (chopsticks-move-solver '((1 1) (1 2)) '((1 1) (1 1)) 1) nil)
 ;;(check= (chopsticks-move-solver '((1 1) (1 1)) '((1 1) (1 1)) 1) t)
 
-
+#|
 ;;if successful, could compare the two method of proving winning satisfiability
 (defthm (implies (chopsticks-win-solver '((1 1) '(0 0)) 0) 
         (chopsticks-move-solver '((0 0) (2 2)) (chopsticks-win-state '((1 1) (0 0)) 0) 0)))
-
+|#
